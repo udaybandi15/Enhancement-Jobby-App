@@ -57,9 +57,10 @@ class Jobs extends Component {
   state = {
     jobsList: [],
     apiStatus: apiStatusConstants.initial,
-    employeeType: [],
-    minimumSalary: 0,
+    employeeTypeList: [],
+    minimumSalary: '',
     searchInput: '',
+    locationsList: [], // Added state to track selected locations
   }
 
   componentDidMount() {
@@ -70,8 +71,9 @@ class Jobs extends Component {
     this.setState({
       apiStatus: apiStatusConstants.inProgress,
     })
-    const {employeeType, minimumSalary, searchInput} = this.state
-    const apiUrl = `https://apis.ccbp.in/jobs?employment_type=${employeeType.join()}&minimum_package=${minimumSalary}&search=${searchInput}`
+    const {employeeTypeList, minimumSalary, searchInput} = this.state
+    const apiUrl = `https://apis.ccbp.in/jobs?employment_type=${employeeTypeList.join()}&minimum_package=${minimumSalary}&search=${searchInput}`
+
     const jwtToken = Cookies.get('jwt_token')
 
     const options = {
@@ -105,13 +107,20 @@ class Jobs extends Component {
   }
 
   renderJobsList = () => {
-    const {jobsList} = this.state
-    const renderJobsList = jobsList.length > 0
+    const {jobsList, locationsList} = this.state
 
-    return renderJobsList ? (
+    // Filter the jobs locally based on active locations
+    const filteredJobsList =
+      locationsList.length > 0
+        ? jobsList.filter(job => locationsList.includes(job.location))
+        : jobsList
+
+    const shouldRenderJobsList = filteredJobsList.length > 0
+
+    return shouldRenderJobsList ? (
       <div className="all-jobs-container">
         <ul className="jobs-list">
-          {jobsList.map(job => (
+          {filteredJobsList.map(job => (
             <JobCard jobData={job} key={job.id} />
           ))}
         </ul>
@@ -174,6 +183,45 @@ class Jobs extends Component {
     }
   }
 
+  changeSalary = salaryRangeId => {
+    this.setState({minimumSalary: salaryRangeId}, this.getJobs)
+  }
+
+  changeEmployeeList = type => {
+    const {employeeTypeList} = this.state
+    const inputNotInList = employeeTypeList.filter(
+      eachItem => eachItem === type,
+    )
+    if (inputNotInList.length === 0) {
+      this.setState(
+        prevState => ({
+          employeeTypeList: [...prevState.employeeTypeList, type],
+        }),
+        this.getJobs,
+      )
+    } else {
+      const filteredData = employeeTypeList.filter(
+        eachItem => eachItem !== type,
+      )
+      this.setState({employeeTypeList: filteredData}, this.getJobs)
+    }
+  }
+
+  // Method to handle updating the selected locations state
+  changeLocation = (location, isChecked) => {
+    if (isChecked) {
+      this.setState(prevState => ({
+        locationsList: [...prevState.locationsList, location],
+      }))
+    } else {
+      this.setState(prevState => ({
+        locationsList: prevState.locationsList.filter(
+          each => each !== location,
+        ),
+      }))
+    }
+  }
+
   changeSearchInput = event => {
     this.setState({searchInput: event.target.value})
   }
@@ -182,17 +230,6 @@ class Jobs extends Component {
     if (event.key === 'Enter') {
       this.getJobs()
     }
-  }
-
-  changeSalary = salary => {
-    this.setState({minimumSalary: salary}, this.getJobs)
-  }
-
-  changeEmployeeList = type => {
-    this.setState(
-      prev => ({employeeType: [...prev.employeeType, type]}),
-      this.getJobs,
-    )
   }
 
   render() {
@@ -210,6 +247,7 @@ class Jobs extends Component {
               getJobs={this.getJobs}
               changeSalary={this.changeSalary}
               changeEmployeeList={this.changeEmployeeList}
+              changeLocation={this.changeLocation} // Passing prop down
             />
             <div className="search-input-jobs-list-container">
               <div className="search-input-container-desktop">
@@ -226,6 +264,7 @@ class Jobs extends Component {
                   className="search-button-container-desktop"
                   onClick={this.getJobs}
                 >
+                  <span className="visually-hidden">Search</span>
                   <BsSearch className="search-icon-desktop" />
                 </button>
               </div>
@@ -237,4 +276,5 @@ class Jobs extends Component {
     )
   }
 }
+
 export default Jobs
